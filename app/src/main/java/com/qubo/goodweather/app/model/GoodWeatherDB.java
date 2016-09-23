@@ -16,7 +16,7 @@ import java.util.List;
  * 操作封装起来
  */
 public class GoodWeatherDB {
-    public static final String DB_NAME = "good_weather";
+    public static final String DB_NAME = "good_weather.db";
     public static final int VERSION = 1;
     private static GoodWeatherDB goodWeatherDB;
     private SQLiteDatabase db;
@@ -69,7 +69,7 @@ public class GoodWeatherDB {
         if (cursor != null) {
             while (cursor.moveToNext()) {
                 Province province = new Province();
-                province.setId(cursor.getInt(cursor.getColumnIndex("id")));
+                province.setId(cursor.getInt(cursor.getColumnIndex("_id")));
                 province.setProvinceName(cursor.getString(cursor.getColumnIndex("province_name")));
                 provinces.add(province);
             }
@@ -100,11 +100,11 @@ public class GoodWeatherDB {
      */
     public List<City> loadCities(int provinceId) {
         List<City> cities = new ArrayList<>();
-        Cursor cursor = db.query("City", null, "privince_id = ?", new String[]{String.valueOf(provinceId)}, null, null, null);
+        Cursor cursor = db.query("City", null, "province_id = ?", new String[]{String.valueOf(provinceId)}, null, null, null);
         if (cursor != null) {
             while (cursor.moveToNext()) {
                 City city = new City();
-                city.setId(cursor.getInt(cursor.getColumnIndex("id")));
+                city.setId(cursor.getInt(cursor.getColumnIndex("_id")));
                 city.setCityName(cursor.getString(cursor.getColumnIndex("city_name")));
                 city.setProvinceId(cursor.getInt(cursor.getColumnIndex("province_id")));
                 cities.add(city);
@@ -130,9 +130,8 @@ public class GoodWeatherDB {
         if (cursor != null) {
             while (cursor.moveToNext()) {
                 County county = new County();
-                county.setId(cursor.getInt(cursor.getColumnIndex("id")));
+                county.setId(cursor.getInt(cursor.getColumnIndex("_id")));
                 county.setCountyName(cursor.getString(cursor.getColumnIndex("county_name")));
-                county.setCountyCode(cursor.getString(cursor.getColumnIndex("county_code")));
                 county.setCityId(cursor.getInt(cursor.getColumnIndex("city_id")));
                 counties.add(county);
             }

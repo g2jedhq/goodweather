@@ -6,20 +6,22 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 /**
  * Created by Qubo on 2016/9/21.
+ * 创建数据库工具类
  */
 public class GoodWeatherOpenHelper extends SQLiteOpenHelper {
+    // 字段设计列表// 字段名 字段数据类型 字段修饰
     public static final String CREATE_PROVINCE = "create table Province(" +
-            "id Integer primary key autoincrement，" +// 字段设计列表
-            "province_name text)";// 字段名 字段数据类型 字段修饰
+            "_id Integer primary key autoincrement," +
+            "province_name text)";
     public static final String CREATE_CITY = "create table City(" +
-            "id Integer primary key autoincrement，" +// 字段设计列表
-            "city_name text，" +// 字段名 字段数据类型 字段修饰
+            "_id Integer primary key autoincrement," +
+            "city_name text," +
             "province_id Integer)";
     public static final String CREATE_COUNTY = "create table County(" +
-            "id Integer primary key autoincrement，" +
-            "county_name text，" +// 字段设计列表
-            "county_code text," +// 字段名 字段数据类型 字段修饰
-            "city_id text)";
+            "_id Integer primary key autoincrement," +
+            "county_name text," +
+            "county_code text," +
+            "city_id Integer)";
 
     public GoodWeatherOpenHelper(Context context, String name, SQLiteDatabase.CursorFactory factory, int version) {
         super(context, name, factory, version);
