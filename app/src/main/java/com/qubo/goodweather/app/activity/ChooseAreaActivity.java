@@ -2,7 +2,10 @@ package com.qubo.goodweather.app.activity;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.Window;
@@ -47,6 +50,10 @@ public class ChooseAreaActivity extends Activity {
      * 查询县
      */
     public static final String TYPE_COUNTY = "county";
+    /**
+     * 记录最近一次按下返回键的时间的毫秒值
+     */
+    private long exitTime;
     private ProgressDialog progressDialog;
     private TextView titleText;
     private ListView listView;
@@ -76,50 +83,69 @@ public class ChooseAreaActivity extends Activity {
      * 选中的城市
      */
     private City selectedCity;
+    private County selectedCounty;
     /**
      * 当前选中的级别
      */
     private int currentLevel;
     private List<String> municipality;
+    private boolean isFromWeatherActivity;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        isFromWeatherActivity = getIntent().getBooleanExtra("from_weather_activity", false);
+        if (!isFromWeatherActivity) {//  已经选择了城市且不是从WeatherActivity跳转过来，才会直接跳转到
+            SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+            if (sharedPreferences.getBoolean("city_selected", false)) {// 已将天气信息存储到本地
+                Intent intent = new Intent(this, WeatherActivity.class);
+                String countyName = sharedPreferences.getString("cityName", "");
+                intent.putExtra("county_name", countyName);
+                startActivity(intent);
+                finish();
+                return;
+            }
+        }
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.choose_area);
-        titleText = (TextView) findViewById(R.id.title_text);
-        listView = (ListView) findViewById(R.id.list_view);
-        municipality = new ArrayList<>();
-        municipality.add("北京");
-        municipality.add("上海");
-        municipality.add("天津");
-        municipality.add("重庆");
-        adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, dataList);
-        listView.setAdapter(adapter);
-        goodWeatherDB = GoodWeatherDB.getInstance(this);
+        init();
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 if (currentLevel == LEVEL_PROVINCE) {
                     selectedProvince = provinceList.get(i);
-                    if (municipality.contains(selectedProvince.getProvinceName())) {
-                        queryCities();
-                        selectedCity = cityList.get(0);
-                        queryCounties();
-                    } else {
-                        queryCities();
-                    }
+                    // if (municipality.contains(selectedProvince.getProvinceName())) {
+                    //queryCities();// 执行在子线程
+                    //selectedCity = cityList.get(0);// 执行在主线程
+                    //queryCounties();
+                    //} else {
+                    queryCities();
+                    //}
                 } else if (currentLevel == LEVEL_CITY) {
                     selectedCity = cityList.get(i);
                     queryCounties();
+                } else if (currentLevel == LEVEL_COUNTY) {
+                    Intent intent = new Intent(ChooseAreaActivity.this, WeatherActivity.class);
+                    intent.putExtra("county_name", countyList.get(i).getCountyName());
+                    startActivity(intent);
+                    finish();
                 }
             }
-
-
         });
         queryProvinces();// 加载省级数据
+    }
 
-
+    private void init() {
+        municipality = new ArrayList<>();
+        municipality.add("北京");
+        municipality.add("上海");
+        municipality.add("天津");
+        municipality.add("重庆");
+        titleText = (TextView) findViewById(R.id.title_text);
+        listView = (ListView) findViewById(R.id.list_view);
+        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
+        listView.setAdapter(adapter);
+        goodWeatherDB = GoodWeatherDB.getInstance(this);
     }
 
     /**
@@ -190,12 +216,11 @@ public class ChooseAreaActivity extends Activity {
     private void queryFromServer(String queryName, final String type) {
         // http://www.weather.com.cn/data/list3/city.xml
         // http://apis.baidu.com/apistore/weatherservice/citylist
-
         String address = null;
         boolean flag = false;// 标志是否设置请求属性
         if (!TextUtils.isEmpty(queryName)) {// 判断queryName非null非""，查询市/县列表
             try {
-                address = "http://apis.baidu.com/apistore/weatherservice/citylist?cityname=" + URLEncoder.encode(queryName,"utf-8");
+                address = "http://apis.baidu.com/apistore/weatherservice/citylist?cityname=" + URLEncoder.encode(queryName, "utf-8");
                 // URLEncoder.encode(s,enc)
                 //使用指定的编码机制enc,将字符串转s,换为 application/x-www-form-urlencoded 格式。该方法使用提供的编码机制获取不安全字符的字节
             } catch (UnsupportedEncodingException e) {
@@ -206,7 +231,8 @@ public class ChooseAreaActivity extends Activity {
             address = "http://www.weather.com.cn/data/list3/city.xml";
         }
         showProgressDialog();
-        HttpUtil.sendHttpRequest(address,flag, new HttpCallbackListener() {
+        // 运行在子线程中的方法
+        HttpUtil.sendHttpRequest(address, flag, new HttpCallbackListener() {
             @Override
             public void onFinish(String response) {
                 boolean result = false;
@@ -242,7 +268,7 @@ public class ChooseAreaActivity extends Activity {
                     @Override
                     public void run() {
                         closeProgressDialog();
-                        Toast.makeText(ChooseAreaActivity.this, "加载失败！", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(ChooseAreaActivity.this, "加载失败！响应结果为空", Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -276,14 +302,26 @@ public class ChooseAreaActivity extends Activity {
      *  捕获Back按键，根据当前的级别来判断，此时应该返回市列表、省列表、还是直接退出
      */
     public void onBackPressed() {
-            if (currentLevel == LEVEL_COUNTY && municipality.contains(selectedCity.getCityName())) {
-                queryProvinces();
-            } else if (currentLevel == LEVEL_COUNTY) {
-                queryCities();
-            } else if (currentLevel == LEVEL_CITY) {
-                queryProvinces();
-            } else if (currentLevel == LEVEL_PROVINCE) {
+        if (currentLevel == LEVEL_COUNTY && municipality.contains(selectedCity.getCityName())) {
+            queryProvinces();
+        } else if (currentLevel == LEVEL_COUNTY) {
+            queryCities();
+        } else if (currentLevel == LEVEL_CITY) {
+            queryProvinces();
+        } else if (currentLevel == LEVEL_PROVINCE) {
+            if (isFromWeatherActivity) {
+                Intent intent = new Intent(this,WeatherActivity.class);
+                startActivity(intent);
+                finish();
+                return;
+            }
+            if (System.currentTimeMillis() - exitTime > 3000) {
+                Toast.makeText(ChooseAreaActivity.this, "再按一次返回键退出", Toast.LENGTH_SHORT).show();
+                exitTime = System.currentTimeMillis();
+            } else {
                 finish();
             }
+        }
     }
+
 }
